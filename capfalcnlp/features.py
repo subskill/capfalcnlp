@@ -147,7 +147,7 @@ def get_word_detectors():
     return {
         # Some detectors need to take the lemma as input, other need to take the word exactly as it is written.
         'Rare': is_rare_word,
-        'Majuscules': is_frequent_word_written_in_capitals,
+        'Majuscules': is_written_in_capitals,
         'Emprunt Anglais': is_english_word,
         'Accronyme': is_accronym,
         'Abbréviation': lambda word: is_abbreviation(word) or is_slang(word),
@@ -180,7 +180,7 @@ def get_substring_start_indexes(substring, text):
     return start_indexes
 
 
-def get_long_sentences(text, threshold=11, count_method=count_content_tokens):
+def get_long_sentences(text, threshold=8, count_method=count_content_tokens):
     sentences = split_in_sentences(text)
     return [sentence for sentence in sentences if count_method(sentence) > threshold]
 
