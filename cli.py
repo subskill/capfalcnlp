@@ -12,4 +12,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
     text = read_file(args.input_file)
     detections = get_detections(text)
-    pprint(detections)
+    print(json.dumps(detections))
