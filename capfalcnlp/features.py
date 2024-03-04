@@ -3,7 +3,8 @@ import math
 import shutil
 import string
 import re
-
+import os
+import pickle
 import spacy
 
 from capfalcnlp.processing import (
@@ -16,6 +17,7 @@ from capfalcnlp.processing import (
 from capfalcnlp.paths import FASTTEXT_EMBEDDINGS_DIR
 from capfalcnlp.helpers import yield_lines, download_and_extract, download
 
+global_word2rank = {}
 
 def download_fasttext_embeddings_if_needed(language='fr', training_corpus='common_crawl'):
     # TODO: Repeated code
@@ -38,14 +40,26 @@ def download_fasttext_embeddings_if_needed(language='fr', training_corpus='commo
 
 @lru_cache()
 def get_word2rank(vocab_size=10 ** 5, language='fr', training_corpus='common_crawl'):
+    global global_word2rank
+
+    if not global_word2rank == {}:
+      return global_word2rank
+
     word2rank = {}
-    line_generator = yield_lines(download_fasttext_embeddings_if_needed(language, training_corpus))
-    next(line_generator)  # Skip the first line (header)
-    for i, line in enumerate(line_generator):
-        if (i + 1) > vocab_size:
-            break
-        word = line.split(' ')[0]
-        word2rank[word] = i
+    file_path = FASTTEXT_EMBEDDINGS_DIR / f'cc.{language}.300.txt'
+    if os.path.exists(file_path):
+      word2rank = charger_modele(file_path)
+    else:
+      line_generator = yield_lines(download_fasttext_embeddings_if_needed(language, training_corpus))
+      next(line_generator)  # Skip the first line (header)
+      for i, line in enumerate(line_generator):
+          if (i + 1) > vocab_size:
+              break
+          word = line.split(' ')[0]
+          word2rank[word] = i
+      sauvegarder_modele(word2rank, file_path)
+
+    global_word2rank = word2rank
     return word2rank
 
 
@@ -147,7 +161,8 @@ def get_word_detectors():
     return {
         # Some detectors need to take the lemma as input, other need to take the word exactly as it is written.
         'Rare': is_rare_word,
-        'Majuscules': is_frequent_word_written_in_capitals,
+        #'Majuscules': is_frequent_word_written_in_capitals,
+        'Majuscules': is_written_in_capitals,
         'Emprunt Anglais': is_english_word,
         'Accronyme': is_accronym,
         'Abbréviation': lambda word: is_abbreviation(word) or is_slang(word),
@@ -180,7 +195,8 @@ def get_substring_start_indexes(substring, text):
     return start_indexes
 
 
-def get_long_sentences(text, threshold=11, count_method=count_content_tokens):
+#def get_long_sentences(text, threshold=11, count_method=count_content_tokens):
+def get_long_sentences(text, threshold=8, count_method=count_content_tokens):
     sentences = split_in_sentences(text)
     return [sentence for sentence in sentences if count_method(sentence) > threshold]
 
@@ -197,3 +213,12 @@ def get_detections(text):
     for sentence in get_long_sentences(text):
         detections.append({'text': sentence, 'char_offset': text.index(sentence), 'detected_type': 'Phrase Longue'})
     return detections
+
+def sauvegarder_modele(modele, chemin_fichier):
+    with open(chemin_fichier, 'wb') as fichier:
+      pickle.dump(modele, fichier)
+
+def charger_modele(chemin_fichier):
+  with open(chemin_fichier, 'rb') as fichier:
+    modele = pickle.load(fichier)
+  return modele
