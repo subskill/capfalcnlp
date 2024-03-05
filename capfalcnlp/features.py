@@ -37,61 +37,53 @@ def download_fasttext_embeddings_if_needed(language='fr', training_corpus='commo
         raise NotImplementedError(f'Training corpus {training_corpus} not recognized')
     return fasttext_embeddings_path
 
-
 @lru_cache()
 def get_word2rank(vocab_size=10 ** 5, language='fr', training_corpus='common_crawl'):
     global global_word2rank
 
     if not global_word2rank == {}:
-      return global_word2rank
+        return global_word2rank
 
     word2rank = {}
     file_path = FASTTEXT_EMBEDDINGS_DIR / f'cc.{language}.300.txt'
     if os.path.exists(file_path):
       word2rank = charger_modele(file_path)
     else:
-      line_generator = yield_lines(download_fasttext_embeddings_if_needed(language, training_corpus))
-      next(line_generator)  # Skip the first line (header)
-      for i, line in enumerate(line_generator):
-          if (i + 1) > vocab_size:
-              break
-          word = line.split(' ')[0]
-          word2rank[word] = i
-      sauvegarder_modele(word2rank, file_path)
+        line_generator = yield_lines(download_fasttext_embeddings_if_needed(language, training_corpus))
+        next(line_generator)  # Skip the first line (header)
+        for i, line in enumerate(line_generator):
+            if (i + 1) > vocab_size:
+                break
+            word = line.split(' ')[0]
+            word2rank[word] = i
+        sauvegarder_modele(word2rank, file_path)
 
     global_word2rank = word2rank
     return word2rank
-
 
 def get_rank(word, **kwargs):
     word2rank = get_word2rank(**kwargs)
     return word2rank.get(word, float('inf'))
 
-
 def get_log_rank(word, **kwargs):
     return math.log(1 + get_rank(word, **kwargs))
-
 
 def is_number(word):
     word = str(word)
     float_regex = '^[+-]?(?:[0-9]*[.,])*[0-9]+$'
     return re.match(float_regex, word) is not None
 
-
 def clean_text(text):
     text = text.replace('\n', ' ')
     return remove_multiple_whitespaces(text)
-
 
 def is_written_in_capitals(word):
     word = str(word)
     return word.upper() == word and word.lower() != word  # The second test excludes strings like '2002' or '.'
 
-
 def is_frequent_word_written_in_capitals(word, rank_threshold=50000, language='fr', **kwargs):
     word = str(word)
     return is_written_in_capitals(word) and get_rank(word.lower(), language='fr', **kwargs) < rank_threshold
-
 
 def is_english_word(word):
     # Example usage:
@@ -104,22 +96,18 @@ def is_english_word(word):
         and get_rank(word, language='en') < 5000
     )
 
-
 def cast_to_lemma_if_possible(word):
     if isinstance(word, spacy.tokens.token.Token):
         word = word.lemma_
     return word
 
-
 def is_rare_word(word, rank_threshold=3500):
     word = cast_to_lemma_if_possible(word)
     return get_rank(word.lower()) > rank_threshold and not is_number(word)
 
-
 def is_accronym(word):
     word = str(word)
     return re.match(r'^(?:[A-Z]\.?)+$', word) is not None and not is_frequent_word_written_in_capitals(word)
-
 
 def is_abbreviation(word):
     word = str(word)
@@ -129,7 +117,6 @@ def is_abbreviation(word):
     # fmt: on
     return word in abbreviations
 
-
 def is_slang(word):
     word = str(word)
     # From https://fr.wiktionary.org/wiki/Annexe:Liste_de_termes_d%E2%80%99argot_Internet
@@ -138,15 +125,12 @@ def is_slang(word):
     # fmt: on
     return word in slang_words
 
-
 def remove_punctuation_characters(word):
     punctuation = string.punctuation + '’' + '\n'
     return ''.join([char for char in word if char not in punctuation])
 
-
 def is_time(word):
     return re.match(r'\d+[hH:]\d*', word) is not None
-
 
 def skip_word_detection(token):
     if len(remove_punctuation_characters(str(token))) <= 1:
@@ -156,19 +140,16 @@ def skip_word_detection(token):
         return True
     return False
 
-
 def get_word_detectors():
     return {
         # Some detectors need to take the lemma as input, other need to take the word exactly as it is written.
         'Rare': is_rare_word,
-        #'Majuscules': is_frequent_word_written_in_capitals,
         'Majuscules': is_written_in_capitals,
         'Emprunt Anglais': is_english_word,
         'Accronyme': is_accronym,
         'Abbréviation': lambda word: is_abbreviation(word) or is_slang(word),
         'Nombre': is_number,
     }
-
 
 def run_detectors(text):
     text = clean_text(text)
@@ -180,7 +161,6 @@ def run_detectors(text):
         if len(detector_results) > 0:
             detector_results[str(token)] = detector_results
     return detector_results
-
 
 def get_substring_start_indexes(substring, text):
     # TODO: We might include some parts of words, e.g. if substring = 'mange', 'manger' will also be included if it is present in the text
@@ -194,12 +174,9 @@ def get_substring_start_indexes(substring, text):
         remaining_text = text[offset:]
     return start_indexes
 
-
-#def get_long_sentences(text, threshold=11, count_method=count_content_tokens):
 def get_long_sentences(text, threshold=8, count_method=count_content_tokens):
     sentences = split_in_sentences(text)
     return [sentence for sentence in sentences if count_method(sentence) > threshold]
-
 
 def get_detections(text):
     detections = []
@@ -216,9 +193,9 @@ def get_detections(text):
 
 def sauvegarder_modele(modele, chemin_fichier):
     with open(chemin_fichier, 'wb') as fichier:
-      pickle.dump(modele, fichier)
+        pickle.dump(modele, fichier)
 
 def charger_modele(chemin_fichier):
-  with open(chemin_fichier, 'rb') as fichier:
-    modele = pickle.load(fichier)
-  return modele
+    with open(chemin_fichier, 'rb') as fichier:
+        modele = pickle.load(fichier)
+    return modele
